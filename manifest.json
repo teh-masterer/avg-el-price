@@ -1,0 +1,11 @@
+{
+    "domain": "avg_el_price",
+    "name": "Average Energy Price",
+    "documentation": "https://github.com/teh-masterer/avg_el_price",
+    "requirements": [],
+    "dependencies": ["recorder"],
+    "codeowners": ["@teh-masterer"],
+    "version": "1.0.0",
+    "config_flow": true
+  }
+  
