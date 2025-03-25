@@ -33,7 +33,10 @@ def get_daily_average_from_states(states):
         try:
             # Remove all whitespace to handle thousand separators.
             value_str = "".join(best_state.state.strip().split())
-            num_str = re.search(r"[\d]+(?:[.,]\d+)?", value_str).group(0)
+            num_match = re.search(r"[\d]+(?:[.,]\d+)?", value_str)
+            if not num_match:
+                raise ValueError("No numeric match found")
+            num_str = num_match.group(0)
             if ',' in num_str and '.' not in num_str:
                 num_str = num_str.replace(',', '.')
             value = float(num_str)
@@ -41,7 +44,10 @@ def get_daily_average_from_states(states):
         except Exception as e:
             _LOGGER.error("Failed to parse state %s: %s", best_state.state, e)
     if daily_values:
-        return sum(daily_values) / len(daily_values)
+        avg = sum(daily_values) / len(daily_values)
+        _LOGGER.debug("Computed daily average from %d values: %s", len(daily_values), avg)
+        return avg
+    _LOGGER.debug("No daily values computed from states.")
     return None
 
 class AverageEnergyPriceSensor(Entity):
@@ -78,6 +84,9 @@ class AverageEnergyPriceSensor(Entity):
         previous_month_start = datetime.datetime(prev_year, prev_month, 1)
         previous_month_end = current_month_start
 
+        _LOGGER.debug("Current month start: %s, now: %s", current_month_start, now)
+        _LOGGER.debug("Previous month start: %s, end: %s", previous_month_start, previous_month_end)
+
         current_states = await self.hass.async_add_executor_job(
             lambda: history.get_state_changes_during_period(
                 self.hass, current_month_start, now, entity_id=self._linked_sensor
@@ -90,9 +99,12 @@ class AverageEnergyPriceSensor(Entity):
         )
         states_current = current_states.get(self._linked_sensor, [])
         states_previous = previous_states.get(self._linked_sensor, [])
+        _LOGGER.debug("Found %d current states and %d previous states for %s",
+                      len(states_current), len(states_previous), self._linked_sensor)
 
         avg_current = get_daily_average_from_states(states_current)
         avg_previous = get_daily_average_from_states(states_previous)
+        _LOGGER.debug("Computed avg_current: %s, avg_previous: %s", avg_current, avg_previous)
 
         self._state = avg_current
         self._attributes = {
@@ -104,14 +116,17 @@ class AverageEnergyPriceSensor(Entity):
 
     @property
     def state(self):
-        return round(self._state, 2) if self._state is not None else "unknown"
+        if self._state is None:
+            _LOGGER.debug("State is None, returning 'unknown'")
+            return "unknown"
+        return round(self._state, 2)
 
     @property
     def extra_state_attributes(self):
         return self._attributes
 
-# --- This function is critical: Home Assistant will call it when forwarding the config entry ---
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     """Set up the Average Energy Price sensor from a config entry."""
     linked_sensor = entry.data.get("entity_id", "sensor.nordpool_kwh_no5_nok_3_10_025")
+    _LOGGER.debug("Setting up AverageEnergyPriceSensor with linked sensor: %s", linked_sensor)
     async_add_entities([AverageEnergyPriceSensor(hass, linked_sensor)])
