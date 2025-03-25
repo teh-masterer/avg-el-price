@@ -4,11 +4,10 @@ import re
 
 from homeassistant.helpers.entity import Entity
 from homeassistant.core import HomeAssistant
-from homeassistant.components.recorder import history
+from homeassistant.components.recorder import history, get_instance as get_recorder_instance
 
 _LOGGER = logging.getLogger(__name__)
 
-# (Optional) Domain constant
 DOMAIN = "avg_el_price"
 
 def get_daily_average_from_states(states):
@@ -33,10 +32,7 @@ def get_daily_average_from_states(states):
         try:
             # Remove all whitespace to handle thousand separators.
             value_str = "".join(best_state.state.strip().split())
-            num_match = re.search(r"[\d]+(?:[.,]\d+)?", value_str)
-            if not num_match:
-                raise ValueError("No numeric match found")
-            num_str = num_match.group(0)
+            num_str = re.search(r"[\d]+(?:[.,]\d+)?", value_str).group(0)
             if ',' in num_str and '.' not in num_str:
                 num_str = num_str.replace(',', '.')
             value = float(num_str)
@@ -87,12 +83,14 @@ class AverageEnergyPriceSensor(Entity):
         _LOGGER.debug("Current month start: %s, now: %s", current_month_start, now)
         _LOGGER.debug("Previous month start: %s, end: %s", previous_month_start, previous_month_end)
 
-        current_states = await self.hass.async_add_executor_job(
+        # Use recorder.get_instance to schedule database calls.
+        recorder = get_recorder_instance(self.hass)
+        current_states = await recorder.async_add_executor_job(
             lambda: history.get_state_changes_during_period(
                 self.hass, current_month_start, now, entity_id=self._linked_sensor
             )
         )
-        previous_states = await self.hass.async_add_executor_job(
+        previous_states = await recorder.async_add_executor_job(
             lambda: history.get_state_changes_during_period(
                 self.hass, previous_month_start, previous_month_end, entity_id=self._linked_sensor
             )
