@@ -8,6 +8,9 @@ from homeassistant.components.recorder import history
 
 _LOGGER = logging.getLogger(__name__)
 
+# (Optional) Domain constant
+DOMAIN = "avg_el_price"
+
 def get_daily_average_from_states(states):
     """Group states by day and return the average of the values closest to 23:50 each day."""
     daily_values = []
@@ -44,8 +47,8 @@ def get_daily_average_from_states(states):
 class AverageEnergyPriceSensor(Entity):
     """Sensor that calculates the average energy price for the current month-to-date.
     
-    It uses historical data from a linked price sensor (which updates frequently) to pick out
-    the reading closest to 23:50 each day for the current month, averages them, and sets this as its state.
+    It uses historical data from a linked price sensor (which updates frequently) to select
+    the reading closest to 23:50 each day, averages these values, and sets this as its state.
     It also computes the previous month's average and exposes it as an attribute.
     """
     def __init__(self, hass: HomeAssistant, linked_sensor: str):
@@ -106,3 +109,9 @@ class AverageEnergyPriceSensor(Entity):
     @property
     def extra_state_attributes(self):
         return self._attributes
+
+# --- This function is critical: Home Assistant will call it when forwarding the config entry ---
+async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
+    """Set up the Average Energy Price sensor from a config entry."""
+    linked_sensor = entry.data.get("entity_id", "sensor.nordpool_kwh_no5_nok_3_10_025")
+    async_add_entities([AverageEnergyPriceSensor(hass, linked_sensor)])
