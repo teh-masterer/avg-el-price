@@ -86,12 +86,12 @@ class AverageEnergyPriceSensor(Entity):
         # Use recorder.get_instance to schedule database calls.
         recorder = get_recorder_instance(self.hass)
         current_states = await recorder.async_add_executor_job(
-            lambda: history.get_state_changes_during_period(
+            lambda: history.state_changes_during_period(
                 self.hass, current_month_start, now, entity_id=self._linked_sensor
             )
         )
         previous_states = await recorder.async_add_executor_job(
-            lambda: history.get_state_changes_during_period(
+            lambda: history.state_changes_during_period(
                 self.hass, previous_month_start, previous_month_end, entity_id=self._linked_sensor
             )
         )
